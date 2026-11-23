@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TiketCerdas – Triase Tiket dengan LLM</title>
+<style>
+  :root { --bg:#f7f8fa; --card:#fff; --text:#1c2430; --muted:#6b7686; --line:#e3e7ee; --brand:#2f6fed; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#12161c; --card:#1b212a; --text:#e8ecf2; --muted:#93a0b2; --line:#2a323d; --brand:#6b9bff; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: system-ui, sans-serif; background:var(--bg); color:var(--text); }
+  main { max-width: 860px; margin: 0 auto; padding: 24px 16px 64px; }
+  h1 { margin: 0 0 4px; font-size: 1.6rem; }
+  p.sub { margin: 0 0 20px; color: var(--muted); }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px; margin-bottom:16px; }
+  textarea { width:100%; min-height:110px; padding:10px; border-radius:8px; border:1px solid var(--line);
+             background:var(--bg); color:var(--text); font:inherit; resize:vertical; }
+  button { margin-top:10px; padding:10px 18px; border:0; border-radius:8px; background:var(--brand);
+           color:#fff; font:inherit; font-weight:600; cursor:pointer; }
+  button:disabled { opacity:.6; cursor:wait; }
+  .tags { display:flex; flex-wrap:wrap; gap:6px; margin:8px 0; }
+  .tag { font-size:.78rem; padding:3px 9px; border-radius:99px; border:1px solid var(--line); }
+  .p-kritis { background:#d92d20; color:#fff; border-color:#d92d20; }
+  .p-tinggi { background:#f79009; color:#fff; border-color:#f79009; }
+  .p-sedang { background:#fdb022; color:#1c2430; border-color:#fdb022; }
+  .p-rendah { background:#12b76a; color:#fff; border-color:#12b76a; }
+  .reply { white-space:pre-wrap; background:var(--bg); border-radius:8px; padding:10px; font-size:.92rem; }
+  .muted { color:var(--muted); font-size:.82rem; }
+  .err { color:#d92d20; margin-top:8px; }
+  .row { display:flex; justify-content:space-between; gap:8px; align-items:baseline; }
+</style>
+</head>
+<body>
+<main>
+  <h1>🎫 TiketCerdas</h1>
+  <p class="sub">Tempel tiket pelanggan, LLM akan menentukan kategori, prioritas, sentimen, ringkasan, dan draf balasan.</p>
+
+  <div id="mode" class="muted" style="margin:-8px 0 12px"></div>
+
+  <div class="card">
+    <textarea id="text" placeholder="Contoh: Sudah 3 hari pesanan saya belum sampai dan CS tidak membalas. Saya minta refund!"></textarea>
+    <button id="btn">Analisis Tiket</button>
+    <div id="err" class="err"></div>
+  </div>
+
+  <h2>Riwayat</h2>
+  <div id="list"></div>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+function render(t) {
+  return `<div class="card">
+    <div class="row"><strong>#${t.id}</strong><span class="muted">${esc(t.created_at)}</span></div>
+    <div class="tags">
+      <span class="tag p-${esc(t.priority)}">prioritas: ${esc(t.priority)}</span>
+      <span class="tag">${esc(t.category)}</span>
+      <span class="tag">sentimen: ${esc(t.sentiment)}</span>
+    </div>
+    <p><strong>Ringkasan:</strong> ${esc(t.summary)}</p>
+    <p class="muted">Tiket asli: ${esc(t.text)}</p>
+    <div class="muted">Draf balasan:</div>
+    <div class="reply">${esc(t.suggested_reply)}</div>
+  </div>`;
+}
+
+async function load() {
+  const r = await fetch('/api/tickets');
+  const data = await r.json();
+  $('list').innerHTML = data.length ? data.map(render).join('') : '<p class="muted">Belum ada tiket.</p>';
+}
+
+$('btn').addEventListener('click', async () => {
+  const text = $('text').value.trim();
+  $('err').textContent = '';
+  if (text.length < 5) { $('err').textContent = 'Tiket terlalu pendek.'; return; }
+  $('btn').disabled = true; $('btn').textContent = 'Menganalisis…';
+  try {
+    const r = await fetch('/api/tickets', {
+      method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({text})
+    });
+    if (!r.ok) { const e = await r.json(); throw new Error(e.detail || 'Terjadi kesalahan'); }
+    $('text').value = '';
+    await load();
+  } catch (e) { $('err').textContent = e.message; }
+  finally { $('btn').disabled = false; $('btn').textContent = 'Analisis Tiket'; }
+});
+
+fetch('/api/health').then(r => r.json()).then(h => {
+  $('mode').textContent = h.provider === 'mock'
+    ? 'Mode demo (aturan kata kunci, tanpa LLM)'
+    : 'LLM aktif: ' + h.provider + ' / ' + h.model;
+}).catch(() => {});
+
+load();
+</script>
+</body>
+</html>
