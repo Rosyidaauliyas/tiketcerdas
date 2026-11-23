@@ -39,7 +39,7 @@ uvicorn app.main:app --reload
 ```
 Buka http://127.0.0.1:8000 (dokumentasi API di `/docs`).
 
-## Memakai LLM sungguhan (gratis)
+## Memakai LLM 
 1. Buat API key gratis di **Groq** (https://console.groq.com/keys) atau **Google AI Studio** (https://aistudio.google.com/apikey). Kuota gratis dapat berubah, cek halaman penyedia.
 2. Di `.env`, ubah:
 ```
